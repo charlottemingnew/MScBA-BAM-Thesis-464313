@@ -1,0 +1,550 @@
+---
+title: "2 Week R Code"
+author: "C M Newman"
+date: "6/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Same code, 2 weeks:
+```{r}
+setwd("/Users/charlottenewman/Downloads/BAM/Thesis/Data")
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(scales)
+library(stargazer)
+library(gridExtra)
+library(psych) #describe() function
+library(plm)
+library(lubridate)
+library(ggpubr)
+library("tidymodels")
+library("glmnet")
+library("kernlab")
+library("skimr")
+library(fastDummies)
+library(olsrr)
+library(GGally)
+library(glmnet)
+library(jtools)
+library(ggstance)
+library(ggpubr)
+library("lmtest")
+library(vtable)
+library(standardize)
+library(car)
+```
+
+```{r}
+pros_A_2w <- read.csv("Prospects A Charlotte.csv", sep = "\t")
+pros_B_2w <- read.csv("Prospects B Charlotte.csv", sep = "\t")
+pros_C_2w <- read.csv("Prospects C Charlotte.csv", sep = "\t")
+ret_A_2w <- read_excel("Ret A Charlotte.xlsx")
+ret_B_2w <- read.csv("Ret B Charlotte.csv", sep = "\t")
+ret_C_2w <- read.csv("Ret C Charlotte.csv", sep = "\t")
+
+names(pros_A_2w)[names(pros_A_2w) == "Customer.code..Recipient."] <- "Customer_Code"
+names(pros_B_2w)[names(pros_B_2w) == "Customer.code..Recipient."] <- "Customer_Code"
+names(pros_C_2w)[names(pros_C_2w) == "Customer.code..Recipient."] <- "Customer_Code"
+names(ret_A_2w)[names(ret_A_2w) == "Customer code (Recipient)"] <- "Customer_Code"
+names(ret_B_2w)[names(ret_B_2w) == "Customer.code..Recipient."] <- "Customer_Code"
+names(ret_C_2w)[names(ret_C_2w) == "Customer.code..Recipient."] <- "Customer_Code"
+
+pros_A_2w <- left_join(pros_A_2w, customer_data, by = "Customer_Code")
+pros_B_2w <- left_join(pros_B_2w, customer_data, by = "Customer_Code")
+pros_C_2w <- left_join(pros_C_2w, customer_data, by = "Customer_Code")
+ret_A_2w <- left_join(ret_A_2w, customer_data, by = "Customer_Code")
+ret_B_2w <- left_join(ret_B_2w, customer_data, by = "Customer_Code")
+ret_C_2w <- left_join(ret_C_2w, customer_data, by = "Customer_Code")
+
+pros_A_2w <- left_join(pros_A_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+pros_B_2w <- left_join(pros_B_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+pros_C_2w <- left_join(pros_C_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_A_2w <- left_join(ret_A_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_B_2w <- left_join(ret_B_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_C_2w <- left_join(ret_C_2w, HA_Sales_Hist_Det, by = "Customer_Code")
+
+pros_A_2w <- left_join(pros_A_2w, HT_Hearing_Loss, by = "Customer_Code")
+pros_B_2w <- left_join(pros_B_2w, HT_Hearing_Loss, by = "Customer_Code")
+pros_C_2w <- left_join(pros_C_2w, HT_Hearing_Loss, by = "Customer_Code")
+ret_A_2w <- left_join(ret_A_2w, HT_Hearing_Loss, by = "Customer_Code")
+ret_B_2w <- left_join(ret_B_2w, HT_Hearing_Loss, by = "Customer_Code")
+ret_C_2w <- left_join(ret_C_2w, HT_Hearing_Loss, by = "Customer_Code")
+
+pros_A_2w <- left_join(pros_A_2w, HT_Hist_Det, by = "Customer_Code")
+pros_B_2w <- left_join(pros_B_2w, HT_Hist_Det, by = "Customer_Code")
+pros_C_2w <- left_join(pros_C_2w, HT_Hist_Det, by = "Customer_Code")
+ret_A_2w <- left_join(ret_A_2w, HT_Hist_Det, by = "Customer_Code")
+ret_B_2w <- left_join(ret_B_2w, HT_Hist_Det, by = "Customer_Code")
+ret_C_2w <- left_join(ret_C_2w, HT_Hist_Det, by = "Customer_Code")
+
+pros_A_2w$Historic_HA_Purchases[is.na(pros_A_2w$Historic_HA_Purchases)] <- 0
+pros_B_2w$Historic_HA_Purchases[is.na(pros_B_2w$Historic_HA_Purchases)] <- 0
+pros_C_2w$Historic_HA_Purchases[is.na(pros_C_2w$Historic_HA_Purchases)] <- 0
+pros_A_2w <- pros_A_2w[pros_A_2w$Historic_HA_Purchases == 0, ]
+pros_B_2w <- pros_B_2w[pros_B_2w$Historic_HA_Purchases == 0, ]
+pros_C_2w <- pros_C_2w[pros_C_2w$Historic_HA_Purchases == 0, ]
+
+names(pros_A_2w)[names(pros_A_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+names(pros_B_2w)[names(pros_B_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+names(pros_C_2w)[names(pros_C_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_A_2w)[names(ret_A_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_B_2w)[names(ret_B_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_C_2w)[names(ret_C_2w) == "Historic_campaings"] <- "Historic_Campaigns"
+
+names(pros_A_2w)[names(pros_A_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(pros_B_2w)[names(pros_B_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(pros_C_2w)[names(pros_C_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_A_2w)[names(ret_A_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_B_2w)[names(ret_B_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_C_2w)[names(ret_C_2w) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+```
+
+prepare dependent variable data:
+```{r}
+#If the last appointment/booking was after the newsletter was sent, we attribute the email as the cause of this. 
+#If it was after the email = 1, if the last booking was before the email = 0.
+#This is my DEPENDENT variable.
+names(pros_A_2w)[names(pros_A_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(pros_B_2w)[names(pros_B_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(pros_C_2w)[names(pros_C_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_A_2w)[names(ret_A_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_B_2w)[names(ret_B_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_C_2w)[names(ret_C_2w) == "Laatste_Hoortest"] <- "Booked_Appointment"
+
+
+pros_A_2w$Booked_Appointment <- ifelse(pros_A_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+pros_B_2w$Booked_Appointment <- ifelse(pros_B_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+pros_C_2w$Booked_Appointment <- ifelse(pros_C_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_A_2w$Booked_Appointment <- ifelse(ret_A_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_B_2w$Booked_Appointment <- ifelse(ret_B_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_C_2w$Booked_Appointment <- ifelse(ret_C_2w$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+```
+
+prepare independent variable data:
+```{r}
+#keep only the LATEST row of the customer, removing duplicates
+pros_A_2w <- distinct(pros_A_2w, Customer_Code, .keep_all = TRUE)
+pros_B_2w <- distinct(pros_B_2w, Customer_Code, .keep_all = TRUE)
+pros_C_2w <- distinct(pros_C_2w, Customer_Code, .keep_all = TRUE)
+ret_A_2w <- distinct(ret_A_2w, Customer_Code, .keep_all = TRUE)
+ret_B_2w <- distinct(ret_B_2w, Customer_Code, .keep_all = TRUE)
+ret_C_2w <- distinct(ret_C_2w, Customer_Code, .keep_all = TRUE)
+
+
+
+#years since they've done their first hearing test until receiving the email
+pros_A_2w$email_date <- ymd("2022/04/05")
+pros_B_2w$email_date <- ymd("2022/04/05")
+pros_C_2w$email_date <- ymd("2022/04/05")
+ret_A_2w$email_date <- ymd("2022/04/05")
+ret_B_2w$email_date <- ymd("2022/04/05")
+ret_C_2w$email_date <- ymd("2022/04/05")
+
+pros_A_2w$Customer_Tenure <- difftime(pros_A_2w$email_date, pros_A_2w$Eerste_Hoortest)
+pros_A_2w$Customer_Tenure <- (pros_A_2w$Customer_Tenure)/365
+pros_A_2w$Customer_Tenure <- as.integer(pros_A_2w$Customer_Tenure)
+
+pros_B_2w$Customer_Tenure <- difftime(pros_B_2w$email_date, pros_B_2w$Eerste_Hoortest)
+pros_B_2w$Customer_Tenure <- (pros_B_2w$Customer_Tenure)/365
+pros_B_2w$Customer_Tenure <- as.integer(pros_B_2w$Customer_Tenure)
+
+pros_C_2w$Customer_Tenure <- difftime(pros_C_2w$email_date, pros_C_2w$Eerste_Hoortest)
+pros_C_2w$Customer_Tenure <- (pros_C_2w$Customer_Tenure)/365
+pros_C_2w$Customer_Tenure <- as.integer(pros_C_2w$Customer_Tenure)
+
+ret_A_2w$Customer_Tenure <- difftime(ret_A_2w$email_date, ret_A_2w$Eerste_Hoortest)
+ret_A_2w$Customer_Tenure <- (ret_A_2w$Customer_Tenure)/365
+ret_A_2w$Customer_Tenure <- as.integer(ret_A_2w$Customer_Tenure)
+
+ret_B_2w$Customer_Tenure <- difftime(ret_B_2w$email_date, ret_B_2w$Eerste_Hoortest)
+ret_B_2w$Customer_Tenure <- (ret_B_2w$Customer_Tenure)/365
+ret_B_2w$Customer_Tenure <- as.integer(ret_B_2w$Customer_Tenure)
+
+ret_C_2w$Customer_Tenure <- difftime(ret_C_2w$email_date, ret_C_2w$Eerste_Hoortest)
+ret_C_2w$Customer_Tenure <- (ret_C_2w$Customer_Tenure)/365
+ret_C_2w$Customer_Tenure <- as.integer(ret_C_2w$Customer_Tenure)
+
+names(pros_A_2w)[names(pros_A_2w) == "Klant_Geslacht"] <- "Gender"
+names(pros_B_2w)[names(pros_B_2w) == "Klant_Geslacht"] <- "Gender"
+names(pros_C_2w)[names(pros_C_2w) == "Klant_Geslacht"] <- "Gender"
+names(ret_A_2w)[names(ret_A_2w) == "Klant_Geslacht"] <- "Gender"
+names(ret_B_2w)[names(ret_B_2w) == "Klant_Geslacht"] <- "Gender"
+names(ret_C_2w)[names(ret_C_2w) == "Klant_Geslacht"] <- "Gender"
+
+#gender binary: 0 = female, 1 = male
+pros_A_2w$Gender <- ifelse(pros_A_2w$Gender == "M", 1, 0)
+pros_B_2w$Gender <- ifelse(pros_B_2w$Gender == "M", 1, 0)
+pros_C_2w$Gender <- ifelse(pros_C_2w$Gender == "M", 1, 0)
+ret_A_2w$Gender <- ifelse(ret_A_2w$Gender == "M", 1, 0)
+ret_B_2w$Gender <- ifelse(ret_B_2w$Gender == "M", 1, 0)
+ret_C_2w$Gender <- ifelse(ret_C_2w$Gender == "M", 1, 0)
+
+
+
+#add columns for prospect vs retention binary, and which treatment group binary
+pros_A_2w$prevention <- 1
+pros_B_2w$prevention <- 0
+pros_C_2w$prevention <- 0
+pros_A_2w$promotion <- 0
+pros_B_2w$promotion <- 1
+pros_C_2w$promotion <- 0
+pros_A_2w$control <- 0
+pros_B_2w$control <- 0
+pros_C_2w$control <- 1
+pros_A_2w$prospect <- 1
+pros_B_2w$prospect <- 1
+pros_C_2w$prospect <- 1
+pros_A_2w$retention <- 0
+pros_B_2w$retention <- 0
+pros_C_2w$retention <- 0
+
+ret_A_2w$prevention <- 1
+ret_B_2w$prevention <- 0
+ret_C_2w$prevention <- 0
+ret_A_2w$promotion <- 0
+ret_B_2w$promotion <- 1
+ret_C_2w$promotion <- 0
+ret_A_2w$control <- 0
+ret_B_2w$control <- 0
+ret_C_2w$control <- 1
+ret_A_2w$prospect <- 0
+ret_B_2w$prospect <- 0
+ret_C_2w$prospect <- 0
+ret_A_2w$retention <- 1
+ret_B_2w$retention <- 1
+ret_C_2w$retention <- 1
+
+```
+
+full dataset:
+```{r}
+full_data2w <- rbind(pros_A_2w, pros_B_2w, pros_C_2w, ret_A_2w, ret_B_2w, ret_C_2w)
+full_data2w$Max_Hearing_Loss <- abs(full_data2w$Max_Hearing_Loss)
+
+#change last few variables to english translation
+names(full_data2w)[names(full_data2w) == "Klant_Geboortedatum"] <- "Birthday"
+names(full_data2w)[names(full_data2w) == "Zorggroep_Naam"] <- "Insurance_Company"
+names(full_data2w)[names(full_data2w) == "Eerste_Hoortoestel"] <- "First_HA"
+names(full_data2w)[names(full_data2w) == "Eerste_Hoortest"] <- "First_HT"
+names(full_data2w)[names(full_data2w) == "Klant_Plaats"] <- "Location"
+names(full_data2w)[names(full_data2w) == "Leeftijd"] <- "Age"
+
+full_data2w$Max_Hearing_Loss <- ifelse(full_data2w$Max_Hearing_Loss >= 35, 1, 0)
+```
+
+descriptive summary statistics:
+```{r}
+st(full_data2w, group = 'prospect', group.test = TRUE, out = 'latex')
+#no significant diff in means
+```
+
+randomisation check:
+prospects:
+```{r}
+prospects_rando_2w <- subset(full_data2w, prospect == 1, select = c(Date:retention))
+
+prospects_prev_vs_contr_2w <- subset(prospects_rando_2w, promotion != 1, select = c(Date:retention))
+prospects_promo_vs_contr_2w <- subset(prospects_rando_2w, prevention != 1, select = c(Date:retention))
+
+
+st(prospects_prev_vs_contr_2w, group = 'prevention', group.test = TRUE, out = 'latex')
+st(prospects_promo_vs_contr_2w, group = 'promotion', group.test = TRUE, out = 'latex')
+#combine manually on latex
+```
+
+retention:
+```{r}
+retention_rando_2w <- subset(full_data2w, retention == 1, select = c(Date:retention))
+
+retention_prev_vs_contr_2w <- subset(retention_rando_2w, promotion != 1, select = c(Date:retention))
+retention_promo_vs_contr_2w <- subset(retention_rando_2w, prevention != 1, select = c(Date:retention))
+
+
+st(retention_prev_vs_contr_2w, group = 'prevention', group.test = TRUE, out = 'latex')
+st(retention_promo_vs_contr_2w, group = 'promotion', group.test = TRUE, out = 'latex')
+#combine manually on latex
+```
+
+scaling the data (normalisation) + Control Regression:
+```{r}
+#to back track a scale() function: data$variable * attr(data$variable, 'scaled:scale') + attr(data$variable, 'scaled:center')
+full_data_scaled_2w <- full_data2w
+
+regression_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "retention", "promotion", "prevention")
+scaled_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+regression_unscaled_vars_2w <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+regression_unscaled_vars_2w <- full_data_scaled_2w[regression_unscaled_vars_2w]
+
+xvars_scaled_2w <- full_data_scaled_2w[scaled_vars_2w]
+xvars_scaled_2w <- scale(xvars_scaled_2w)
+mean(xvars_scaled_2w, na.rm = TRUE)
+sd(xvars_scaled_2w, na.rm = TRUE)
+
+regression_vars_complete_2w <- cbind(xvars_scaled_2w, regression_unscaled_vars_2w)
+
+regression_control_2w <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + retention + promotion + prevention, data = regression_vars_complete_2w)
+
+bptest(regression_control_2w) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_control_2w <- coeftest(regression_control_2w, vcov = vcovHC(regression_control_2w, type="HC1"))
+
+summary(regression_control_2w)
+
+stargazer(regression_control_2w, type = "latex")
+```
+
+Prospects Regression:
+```{r}
+pros_regression_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+pros_scaled_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+pros_regression_unscaled_vars_2w <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+pros_regression_unscaled_vars_2w <- full_data_scaled_2w[pros_regression_unscaled_vars_2w]
+
+pros_xvars_scaled_2w <- full_data_scaled_2w[pros_scaled_vars_2w]
+pros_xvars_scaled_2w <- scale(pros_xvars_scaled_2w )
+mean(pros_xvars_scaled_2w, na.rm = TRUE)
+sd(pros_xvars_scaled_2w, na.rm = TRUE)
+
+pros_regression_vars_complete_2w <- cbind(pros_xvars_scaled_2w, pros_regression_unscaled_vars_2w)
+pros_regression_vars_complete_2w <- subset(pros_regression_vars_complete_2w, retention == 0, select = c(Age:prevention))
+
+regression_prospects_2w <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = pros_regression_vars_complete_2w)
+
+bptest(regression_prospects_2w) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_prospects_2w <- coeftest(regression_prospects_2w, vcov = vcovHC(regression_prospects_2w, type="HC1"))
+
+summary(regression_prospects_2w)
+
+stargazer(regression_prospects_2w, type = "latex")
+
+```
+
+retention regression:
+```{r}
+ret_regression_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+ret_scaled_vars_2w <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+ret_regression_unscaled_vars_2w <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+ret_regression_unscaled_vars_2w <- full_data_scaled_2w[ret_regression_unscaled_vars_2w]
+
+ret_xvars_scaled_2w <- full_data_scaled_2w[ret_scaled_vars_2w]
+ret_xvars_scaled_2w <- scale(ret_xvars_scaled_2w)
+mean(ret_xvars_scaled_2w, na.rm = TRUE)
+sd(ret_xvars_scaled_2w, na.rm = TRUE)
+
+ret_regression_vars_complete_2w <- cbind(ret_xvars_scaled_2w, ret_regression_unscaled_vars_2w)
+ret_regression_vars_complete_2w <- subset(ret_regression_vars_complete_2w, retention == 1, select = c(Age:prevention))
+
+regression_retention_2w <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = ret_regression_vars_complete_2w)
+
+bptest(regression_retention_2w) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_retention_2w <- coeftest(regression_retention_2w, vcov = vcovHC(regression_retention_2w, type="HC1"))
+
+summary(regression_retention_2w)
+
+stargazer(regression_prospects_2w, regression_retention_2w, type = "latex")
+
+```
+
+
+
+ALTERNATIVE DEPENDENT VAR 1 (Type)
+scaling the data (normalisation) + Control Regression:
+```{r}
+#to back track a scale() function: data$variable * attr(data$variable, 'scaled:scale') + attr(data$variable, 'scaled:center')
+full_data_type_2w <- full_data
+ifelse(full_data_type_2w$Type == 2, 1, 0)
+full_data_scaled_2w_alt1 <- full_data_type_2w
+
+regression_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "retention", "promotion", "prevention")
+scaled_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+regression_unscaled_vars_2w_alt1 <- c("Type", "retention", "promotion", "prevention")
+
+regression_unscaled_vars_2w_alt1 <- full_data_scaled_2w_alt1[regression_unscaled_vars_2w_alt1]
+
+xvars_scaled_2w_alt1 <- full_data_scaled_2w_alt1[scaled_vars_2w_alt1]
+xvars_scaled_2w_alt1 <- scale(xvars_scaled_2w_alt1)
+mean(xvars_scaled_2w_alt1, na.rm = TRUE)
+sd(xvars_scaled_2w_alt1, na.rm = TRUE)
+
+regression_vars_complete_2w_alt1 <- cbind(xvars_scaled_2w_alt1, regression_unscaled_vars_2w_alt1)
+
+regression_control_2w_alt1 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + retention + promotion + prevention, data = regression_vars_complete_2w_alt1)
+
+bptest(regression_control_2w_alt1) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do extra step
+regression_control_2w_alt1 <- coeftest(regression_control_2w_alt1, vcov = vcovHC(regression_control_2w_alt1, type="HC1"))
+
+summary(regression_control_2w_alt1)
+
+stargazer(regression_control_2w_alt1, type = "latex")
+```
+
+Prospects Regression:
+```{r}
+pros_regression_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+pros_scaled_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+pros_regression_unscaled_vars_2w_alt1 <- c("Type", "retention", "promotion", "prevention")
+
+pros_regression_unscaled_vars_2w_alt1 <- full_data_scaled_2w_alt1[pros_regression_unscaled_vars_2w_alt1]
+
+pros_xvars_scaled_2w_alt1 <- full_data_scaled_2w_alt1[pros_scaled_vars_2w_alt1]
+pros_xvars_scaled_2w_alt1 <- scale(pros_xvars_scaled_2w_alt1)
+mean(pros_xvars_scaled_2w_alt1, na.rm = TRUE)
+sd(pros_xvars_scaled_2w_alt1, na.rm = TRUE)
+
+pros_regression_vars_complete_2w_alt1 <- cbind(pros_xvars_scaled_2w_alt1, pros_regression_unscaled_vars_2w_alt1)
+pros_regression_vars_complete_2w_alt1 <- subset(pros_regression_vars_complete_2w_alt1, retention == 0, select = c(Age:prevention))
+
+regression_prospects_2w_alt1 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = pros_regression_vars_complete_2w_alt1)
+
+bptest(regression_prospects_2w_alt1) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do additional steps.
+
+regression_prospects_2w_alt1 <- coeftest(regression_prospects_2w_alt1, vcov = vcovHC(regression_prospects_2w_alt1, type="HC1"))
+
+summary(regression_prospects_2w_alt1)
+
+stargazer(regression_prospects_2w_alt1, type = "latex")
+
+```
+
+retention regression:
+```{r}
+ret_regression_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+ret_scaled_vars_2w_alt1 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+ret_regression_unscaled_vars_2w_alt1 <- c("Type", "retention", "promotion", "prevention")
+
+ret_regression_unscaled_vars_2w_alt1 <- full_data_scaled_2w_alt1[ret_regression_unscaled_vars_2w_alt1]
+
+ret_xvars_scaled_2w_alt1 <- full_data_scaled_2w_alt1[ret_scaled_vars_2w_alt1]
+ret_xvars_scaled_2w_alt1 <- scale(ret_xvars_scaled_2w_alt1)
+mean(ret_xvars_scaled_2w_alt1, na.rm = TRUE)
+sd(ret_xvars_scaled_2w_alt1, na.rm = TRUE)
+
+ret_regression_vars_complete_2w_alt1 <- cbind(ret_xvars_scaled_2w_alt1, ret_regression_unscaled_vars_2w_alt1)
+ret_regression_vars_complete_2w_alt1 <- subset(ret_regression_vars_complete_2w_alt1, retention == 1, select = c(Age:prevention))
+
+regression_retention_2w_alt1 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = ret_regression_vars_complete_2w_alt1)
+
+bptest(regression_retention_2w_alt1) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_retention_2w_alt1 <- coeftest(regression_retention_2w_alt1, vcov = vcovHC(regression_retention_2w_alt1, type="HC1"))
+
+summary(regression_retention_2w_alt1)
+
+stargazer(regression_control_2w_alt1, regression_prospects_2w_alt1, regression_retention_2w_alt1, type = "latex")
+
+```
+
+
+
+ALTERNATIVE DEPENDENT VAR 2
+scaling the data (normalisation) + Control Regression:
+```{r}
+#to back track a scale() function: data$variable * attr(data$variable, 'scaled:scale') + attr(data$variable, 'scaled:center')
+full_data_unsub_2w <- full_data
+ifelse(full_data_unsub_2w$Type == 3, 1, 0)
+full_data_scaled_2w_alt2 <- full_data_unsub_2w
+
+regression_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "retention", "promotion", "prevention")
+scaled_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+regression_unscaled_vars_2w_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+regression_unscaled_vars_2w_alt2 <- full_data_scaled_2w_alt2[regression_unscaled_vars_2w_alt2]
+
+xvars_scaled_2w_alt2 <- full_data_scaled_2w_alt2[scaled_vars_2w_alt2]
+xvars_scaled_2w_alt2 <- scale(xvars_scaled_2w_alt2)
+mean(xvars_scaled_2w_alt2, na.rm = TRUE)
+sd(xvars_scaled_2w_alt2, na.rm = TRUE)
+
+regression_vars_complete_2w_alt2 <- cbind(xvars_scaled_2w_alt2, regression_unscaled_vars_2w_alt2)
+
+regression_control_2w_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + retention + promotion + prevention, data = regression_vars_complete_2w_alt2)
+
+bptest(regression_control_2w_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do extra step
+regression_control_2w_alt2 <- coeftest(regression_control_2w_alt2, vcov = vcovHC(regression_control_2w_alt2, type="HC1"))
+
+summary(regression_control_2w_alt2)
+
+stargazer(regression_control_2w_alt2, type = "latex")
+```
+
+Prospects Regression:
+```{r}
+pros_regression_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+pros_scaled_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+pros_regression_unscaled_vars_2w_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+pros_regression_unscaled_vars_2w_alt2 <- full_data_scaled_2w_alt2[pros_regression_unscaled_vars_2w_alt2]
+
+pros_xvars_scaled_2w_alt2 <- full_data_scaled_2w_alt2[pros_scaled_vars_2w_alt2]
+pros_xvars_scaled_2w_alt2 <- scale(pros_xvars_scaled_2w_alt2)
+mean(pros_xvars_scaled_2w_alt2, na.rm = TRUE)
+sd(pros_xvars_scaled_2w_alt2, na.rm = TRUE)
+
+pros_regression_vars_complete_2w_alt2 <- cbind(pros_xvars_scaled_2w_alt2, pros_regression_unscaled_vars_2w_alt2)
+pros_regression_vars_complete_2w_alt2 <- subset(pros_regression_vars_complete_2w_alt2, retention == 0, select = c(Age:prevention))
+
+regression_prospects_2w_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = pros_regression_vars_complete_2w_alt2)
+
+bptest(regression_prospects_2w_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do additional steps.
+
+regression_prospects_2w_alt2 <- coeftest(regression_prospects_2w_alt2, vcov = vcovHC(regression_prospects_2w_alt2, type="HC1"))
+
+summary(regression_prospects_2w_alt2)
+
+stargazer(regression_prospects_alt2, type = "latex")
+
+```
+
+retention regression:
+```{r}
+ret_regression_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+ret_scaled_vars_2w_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+ret_regression_unscaled_vars_2w_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+ret_regression_unscaled_vars_2w_alt2 <- full_data_scaled_2w_alt2[ret_regression_unscaled_vars_2w_alt2]
+
+ret_xvars_scaled_2w_alt2 <- full_data_scaled_2w_alt2[ret_scaled_vars_2w_alt2]
+ret_xvars_scaled_2w_alt2 <- scale(ret_xvars_scaled_2w_alt2)
+mean(ret_xvars_scaled_2w_alt2, na.rm = TRUE)
+sd(ret_xvars_scaled_2w_alt2, na.rm = TRUE)
+
+ret_regression_vars_complete_2w_alt2 <- cbind(ret_xvars_scaled_2w_alt2, ret_regression_unscaled_vars_2w_alt2)
+ret_regression_vars_complete_2w_alt2 <- subset(ret_regression_vars_complete_2w_alt2, retention == 1, select = c(Age:prevention))
+
+regression_retention_2w_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = ret_regression_vars_complete_2w_alt2)
+
+bptest(regression_retention_2w_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_retention_2w_alt2 <- coeftest(regression_retention_2w_alt2, vcov = vcovHC(regression_retention_2w_alt2, type="HC1"))
+
+summary(regression_retention_2w_alt2)
+
+stargazer(regression_control_2w_alt2, regression_prospects_2w_alt2, regression_retention_2w_alt2, type = "latex")
+
+```
+
+
+
+
+

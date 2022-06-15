@@ -1,0 +1,652 @@
+---
+title: "Thesis Code"
+author: "C M Newman"
+date: "5/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+packages
+```{r}
+setwd("/Users/charlottenewman/Downloads/BAM/Thesis/Data")
+rm(list=ls())
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(scales)
+library(stargazer)
+library(gridExtra)
+library(psych) #describe() function
+library(plm)
+library(lubridate)
+library(ggpubr)
+library("tidymodels")
+library("glmnet")
+library("kernlab")
+library("skimr")
+library(fastDummies)
+library(olsrr)
+library(GGally)
+library(glmnet)
+library(jtools)
+library(ggstance)
+library(ggpubr)
+library("lmtest")
+library(vtable)
+library(standardize)
+library(car)
+```
+
+
+download data
+```{r}
+setwd("/Users/charlottenewman/Downloads/BAM/Thesis/Data")
+
+customer_data <- read_excel("Project Charlotte v2.xlsx", sheet = 2)
+customer_data$Klant_Geboortedatum <- ymd(customer_data$Klant_Geboortedatum)
+customer_data$Eerste_Hoortoestel <- ymd(customer_data$Eerste_Hoortoestel)
+customer_data$Eerste_Hoortest <- ymd(customer_data$Eerste_Hoortest)
+customer_data$Laatste_Hoortest <- ymd(customer_data$Laatste_Hoortest)
+customer_data$Laatste_Hoortoestel_Koop <- ymd(customer_data$Laatste_Hoortoestel_Koop)
+
+#A = prevention, B = promotion, C = control
+pros_A_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 4)
+pros_B_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 5)
+pros_C_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 6)
+ret_A_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 7)
+ret_B_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 8)
+ret_C_1mo <- read_excel("Project Charlotte v2.xlsx", sheet = 9)
+
+
+HA_Sales_Hist_Det <- read_excel("Project Charlotte v3.xlsx", sheet = 6)
+HT_Hist_Det <- read_excel("Project Charlotte v3.xlsx", sheet = 7)
+HA_Sales_Hist_Det <- HA_Sales_Hist_Det[c("Klant_BK_Code", "BK_VerkoopOrder", "Year")]
+HT_Hist_Det <- HT_Hist_Det[c("CUSTOMER_CODE", "HearingLoss", "Year", "Max Loss")]
+
+HT_Hearing_Loss <- read_excel("Project Charlotte v3.xlsx", sheet = 7)
+HT_Hearing_Loss <- HT_Hearing_Loss[c("CUSTOMER_CODE", "Max Loss")]
+```
+
+join data by customer code, rename columns
+```{r}
+names(customer_data)[names(customer_data) == "Klant_BK_Code"] <- "Customer_Code"
+names(pros_A_1mo)[names(pros_A_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+names(pros_B_1mo)[names(pros_B_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+names(pros_C_1mo)[names(pros_C_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+names(ret_A_1mo)[names(ret_A_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+names(ret_B_1mo)[names(ret_B_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+names(ret_C_1mo)[names(ret_C_1mo) == "Customer code (Recipient)"] <- "Customer_Code"
+
+pros_A_1mo <- left_join(pros_A_1mo, customer_data, by = "Customer_Code")
+pros_B_1mo <- left_join(pros_B_1mo, customer_data, by = "Customer_Code")
+pros_C_1mo <- left_join(pros_C_1mo, customer_data, by = "Customer_Code")
+ret_A_1mo <- left_join(ret_A_1mo, customer_data, by = "Customer_Code")
+ret_B_1mo <- left_join(ret_B_1mo, customer_data, by = "Customer_Code")
+ret_C_1mo <- left_join(ret_C_1mo, customer_data, by = "Customer_Code")
+
+names(HA_Sales_Hist_Det)[names(HA_Sales_Hist_Det) == "Year"] <- "Year_Purchase"
+names(HA_Sales_Hist_Det)[names(HA_Sales_Hist_Det) == "Klant_BK_Code"] <- "Customer_Code"
+names(HA_Sales_Hist_Det)[names(HA_Sales_Hist_Det) == "BK_VerkoopOrder"] <- "HA_Order"
+names(HT_Hist_Det)[names(HT_Hist_Det) == "CUSTOMER_CODE"] <- "Customer_Code"
+names(HT_Hist_Det)[names(HT_Hist_Det) == "Year"] <- "Year_Test"
+names(HT_Hist_Det)[names(HT_Hist_Det) == "Max Loss"] <- "Maximum_Hearing_Loss"
+
+HA_Sales_Hist_Det <- HA_Sales_Hist_Det %>%
+  group_by(Customer_Code) %>%
+  mutate(unique_years_purchased = n_distinct(Year_Purchase))
+names(HA_Sales_Hist_Det)[names(HA_Sales_Hist_Det) == "unique_years_purchased"] <- "Historic_HA_Purchases"
+HA_Sales_Hist_Det <- HA_Sales_Hist_Det[c("Customer_Code", "Historic_HA_Purchases")]
+HA_Sales_Hist_Det <- HA_Sales_Hist_Det %>%
+  distinct()
+
+pros_A_1mo <- left_join(pros_A_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+pros_B_1mo <- left_join(pros_B_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+pros_C_1mo <- left_join(pros_C_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_A_1mo <- left_join(ret_A_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_B_1mo <- left_join(ret_B_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+ret_C_1mo <- left_join(ret_C_1mo, HA_Sales_Hist_Det, by = "Customer_Code")
+
+names(HT_Hearing_Loss)[names(HT_Hearing_Loss) == "Max Loss"] <- "Max_Hearing_Loss"
+names(HT_Hearing_Loss)[names(HT_Hearing_Loss) == "CUSTOMER_CODE"] <- "Customer_Code"
+HT_Hearing_Loss <- HT_Hearing_Loss %>%
+  group_by(Customer_Code) %>%
+  summarize(Max_Hearing_Loss = max(Max_Hearing_Loss))
+
+pros_A_1mo <- left_join(pros_A_1mo, HT_Hearing_Loss, by = "Customer_Code")
+pros_B_1mo <- left_join(pros_B_1mo, HT_Hearing_Loss, by = "Customer_Code")
+pros_C_1mo <- left_join(pros_C_1mo, HT_Hearing_Loss, by = "Customer_Code")
+ret_A_1mo <- left_join(ret_A_1mo, HT_Hearing_Loss, by = "Customer_Code")
+ret_B_1mo <- left_join(ret_B_1mo, HT_Hearing_Loss, by = "Customer_Code")
+ret_C_1mo <- left_join(ret_C_1mo, HT_Hearing_Loss, by = "Customer_Code")
+
+HT_Hist_Det <- HT_Hist_Det %>%
+  group_by(Customer_Code) %>%
+  summarize(Last_HearingTest = max(Year_Test))
+
+pros_A_1mo <- left_join(pros_A_1mo, HT_Hist_Det, by = "Customer_Code")
+pros_B_1mo <- left_join(pros_B_1mo, HT_Hist_Det, by = "Customer_Code")
+pros_C_1mo <- left_join(pros_C_1mo, HT_Hist_Det, by = "Customer_Code")
+ret_A_1mo <- left_join(ret_A_1mo, HT_Hist_Det, by = "Customer_Code")
+ret_B_1mo <- left_join(ret_B_1mo, HT_Hist_Det, by = "Customer_Code")
+ret_C_1mo <- left_join(ret_C_1mo, HT_Hist_Det, by = "Customer_Code")
+
+#removing error customers, these were registered as prospects but actually have made purchases and are therefore customers who received the wrong emails!
+pros_A_1mo$Historic_HA_Purchases[is.na(pros_A_1mo$Historic_HA_Purchases)] <- 0
+pros_B_1mo$Historic_HA_Purchases[is.na(pros_B_1mo$Historic_HA_Purchases)] <- 0
+pros_C_1mo$Historic_HA_Purchases[is.na(pros_C_1mo$Historic_HA_Purchases)] <- 0
+pros_A_1mo <- pros_A_1mo[pros_A_1mo$Historic_HA_Purchases == 0, ]
+pros_B_1mo <- pros_B_1mo[pros_B_1mo$Historic_HA_Purchases == 0, ]
+pros_C_1mo <- pros_C_1mo[pros_C_1mo$Historic_HA_Purchases == 0, ]
+
+names(pros_A_1mo)[names(pros_A_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+names(pros_B_1mo)[names(pros_B_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+names(pros_C_1mo)[names(pros_C_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_A_1mo)[names(ret_A_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_B_1mo)[names(ret_B_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+names(ret_C_1mo)[names(ret_C_1mo) == "Historic_campaings"] <- "Historic_Campaigns"
+
+names(pros_A_1mo)[names(pros_A_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(pros_B_1mo)[names(pros_B_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(pros_C_1mo)[names(pros_C_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_A_1mo)[names(ret_A_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_B_1mo)[names(ret_B_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+names(ret_C_1mo)[names(ret_C_1mo) == "Laatste_Hoortoestel_Koop"] <- "Last_HA_Purchase"
+```
+
+
+prepare dependent variable data:
+```{r}
+#If the last appointment/booking was after the newsletter was sent, we attribute the email as the cause of this. 
+#If it was after the email = 1, if the last booking was before the email = 0.
+#This is my DEPENDENT variable.
+names(pros_A_1mo)[names(pros_A_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(pros_B_1mo)[names(pros_B_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(pros_C_1mo)[names(pros_C_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_A_1mo)[names(ret_A_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_B_1mo)[names(ret_B_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+names(ret_C_1mo)[names(ret_C_1mo) == "Laatste_Hoortest"] <- "Booked_Appointment"
+
+
+pros_A_1mo$Booked_Appointment <- ifelse(pros_A_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+pros_B_1mo$Booked_Appointment <- ifelse(pros_B_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+pros_C_1mo$Booked_Appointment <- ifelse(pros_C_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_A_1mo$Booked_Appointment <- ifelse(ret_A_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_B_1mo$Booked_Appointment <- ifelse(ret_B_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+ret_C_1mo$Booked_Appointment <- ifelse(ret_C_1mo$Booked_Appointment > as.Date("2022/04/05", format = "%Y/%m/%d"), 1, 0)
+```
+
+prepare independent variable data:
+```{r}
+#keep only the LATEST row of the customer, removing duplicates
+pros_A_1mo <- distinct(pros_A_1mo, Customer_Code, .keep_all = TRUE)
+pros_B_1mo <- distinct(pros_B_1mo, Customer_Code, .keep_all = TRUE)
+pros_C_1mo <- distinct(pros_C_1mo, Customer_Code, .keep_all = TRUE)
+ret_A_1mo <- distinct(ret_A_1mo, Customer_Code, .keep_all = TRUE)
+ret_B_1mo <- distinct(ret_B_1mo, Customer_Code, .keep_all = TRUE)
+ret_C_1mo <- distinct(ret_C_1mo, Customer_Code, .keep_all = TRUE)
+
+
+
+#years since they've done their first hearing test until receiving the email
+pros_A_1mo$email_date <- ymd("2022/04/05")
+pros_B_1mo$email_date <- ymd("2022/04/05")
+pros_C_1mo$email_date <- ymd("2022/04/05")
+ret_A_1mo$email_date <- ymd("2022/04/05")
+ret_B_1mo$email_date <- ymd("2022/04/05")
+ret_C_1mo$email_date <- ymd("2022/04/05")
+
+pros_A_1mo$Customer_Tenure <- difftime(pros_A_1mo$email_date, pros_A_1mo$Eerste_Hoortest)
+pros_A_1mo$Customer_Tenure <- (pros_A_1mo$Customer_Tenure)/365
+pros_A_1mo$Customer_Tenure <- as.integer(pros_A_1mo$Customer_Tenure)
+
+pros_B_1mo$Customer_Tenure <- difftime(pros_B_1mo$email_date, pros_B_1mo$Eerste_Hoortest)
+pros_B_1mo$Customer_Tenure <- (pros_B_1mo$Customer_Tenure)/365
+pros_B_1mo$Customer_Tenure <- as.integer(pros_B_1mo$Customer_Tenure)
+
+pros_C_1mo$Customer_Tenure <- difftime(pros_C_1mo$email_date, pros_C_1mo$Eerste_Hoortest)
+pros_C_1mo$Customer_Tenure <- (pros_C_1mo$Customer_Tenure)/365
+pros_C_1mo$Customer_Tenure <- as.integer(pros_C_1mo$Customer_Tenure)
+
+ret_A_1mo$Customer_Tenure <- difftime(ret_A_1mo$email_date, ret_A_1mo$Eerste_Hoortest)
+ret_A_1mo$Customer_Tenure <- (ret_A_1mo$Customer_Tenure)/365
+ret_A_1mo$Customer_Tenure <- as.integer(ret_A_1mo$Customer_Tenure)
+
+ret_B_1mo$Customer_Tenure <- difftime(ret_B_1mo$email_date, ret_B_1mo$Eerste_Hoortest)
+ret_B_1mo$Customer_Tenure <- (ret_B_1mo$Customer_Tenure)/365
+ret_B_1mo$Customer_Tenure <- as.integer(ret_B_1mo$Customer_Tenure)
+
+ret_C_1mo$Customer_Tenure <- difftime(ret_C_1mo$email_date, ret_C_1mo$Eerste_Hoortest)
+ret_C_1mo$Customer_Tenure <- (ret_C_1mo$Customer_Tenure)/365
+ret_C_1mo$Customer_Tenure <- as.integer(ret_C_1mo$Customer_Tenure)
+
+names(pros_A_1mo)[names(pros_A_1mo) == "Klant_Geslacht"] <- "Gender"
+names(pros_B_1mo)[names(pros_B_1mo) == "Klant_Geslacht"] <- "Gender"
+names(pros_C_1mo)[names(pros_C_1mo) == "Klant_Geslacht"] <- "Gender"
+names(ret_A_1mo)[names(ret_A_1mo) == "Klant_Geslacht"] <- "Gender"
+names(ret_B_1mo)[names(ret_B_1mo) == "Klant_Geslacht"] <- "Gender"
+names(ret_C_1mo)[names(ret_C_1mo) == "Klant_Geslacht"] <- "Gender"
+
+#gender binary: 0 = female, 1 = male
+pros_A_1mo$Gender <- ifelse(pros_A_1mo$Gender == "M", 1, 0)
+pros_B_1mo$Gender <- ifelse(pros_B_1mo$Gender == "M", 1, 0)
+pros_C_1mo$Gender <- ifelse(pros_C_1mo$Gender == "M", 1, 0)
+ret_A_1mo$Gender <- ifelse(ret_A_1mo$Gender == "M", 1, 0)
+ret_B_1mo$Gender <- ifelse(ret_B_1mo$Gender == "M", 1, 0)
+ret_C_1mo$Gender <- ifelse(ret_C_1mo$Gender == "M", 1, 0)
+
+
+
+#add columns for prospect vs retention binary, and which treatment group binary
+pros_A_1mo$prevention <- 1
+pros_B_1mo$prevention <- 0
+pros_C_1mo$prevention <- 0
+pros_A_1mo$promotion <- 0
+pros_B_1mo$promotion <- 1
+pros_C_1mo$promotion <- 0
+pros_A_1mo$control <- 0
+pros_B_1mo$control <- 0
+pros_C_1mo$control <- 1
+pros_A_1mo$prospect <- 1
+pros_B_1mo$prospect <- 1
+pros_C_1mo$prospect <- 1
+pros_A_1mo$retention <- 0
+pros_B_1mo$retention <- 0
+pros_C_1mo$retention <- 0
+
+ret_A_1mo$prevention <- 1
+ret_B_1mo$prevention <- 0
+ret_C_1mo$prevention <- 0
+ret_A_1mo$promotion <- 0
+ret_B_1mo$promotion <- 1
+ret_C_1mo$promotion <- 0
+ret_A_1mo$control <- 0
+ret_B_1mo$control <- 0
+ret_C_1mo$control <- 1
+ret_A_1mo$prospect <- 0
+ret_B_1mo$prospect <- 0
+ret_C_1mo$prospect <- 0
+ret_A_1mo$retention <- 1
+ret_B_1mo$retention <- 1
+ret_C_1mo$retention <- 1
+
+```
+
+full dataset:
+```{r}
+full_data <- rbind(pros_A_1mo, pros_B_1mo, pros_C_1mo, ret_A_1mo, ret_B_1mo, ret_C_1mo)
+full_data$Max_Hearing_Loss <- abs(full_data$Max_Hearing_Loss)
+
+#change last few variables to english translation
+names(full_data)[names(full_data) == "Klant_Geboortedatum"] <- "Birthday"
+names(full_data)[names(full_data) == "Zorggroep_Naam"] <- "Insurance_Company"
+names(full_data)[names(full_data) == "Eerste_Hoortoestel"] <- "First_HA"
+names(full_data)[names(full_data) == "Eerste_Hoortest"] <- "First_HT"
+names(full_data)[names(full_data) == "Klant_Plaats"] <- "Location"
+names(full_data)[names(full_data) == "Leeftijd"] <- "Age"
+
+full_data$Max_Hearing_Loss <- ifelse(full_data$Max_Hearing_Loss >= 35, 1, 0)
+```
+
+descriptive summary statistics:
+```{r}
+st(full_data, group = 'prospect', group.test = TRUE, out = 'latex')
+```
+
+randomisation check:
+prospects:
+```{r}
+prospects_rando <- subset(full_data, prospect == 1, select = c(Date:retention))
+
+prospects_prev_vs_contr <- subset(prospects_rando, promotion != 1, select = c(Date:retention))
+prospects_promo_vs_contr <- subset(prospects_rando, prevention != 1, select = c(Date:retention))
+
+
+st(prospects_prev_vs_contr, group = 'prevention', group.test = TRUE, out = 'latex')
+st(prospects_promo_vs_contr, group = 'promotion', group.test = TRUE, out = 'latex')
+#combine manually on latex
+```
+
+retention:
+```{r}
+retention_rando <- subset(full_data, retention == 1, select = c(Date:retention))
+
+retention_prev_vs_contr <- subset(retention_rando, promotion != 1, select = c(Date:retention))
+retention_promo_vs_contr <- subset(retention_rando, prevention != 1, select = c(Date:retention))
+
+
+st(retention_prev_vs_contr, group = 'prevention', group.test = TRUE, out = 'latex')
+st(retention_promo_vs_contr, group = 'promotion', group.test = TRUE, out = 'latex')
+#combine manually on latex
+```
+
+scaling the data (normalisation) + Control Regression:
+```{r}
+#to back track a scale() function: data$variable * attr(data$variable, 'scaled:scale') + attr(data$variable, 'scaled:center')
+full_data_scaled <- full_data
+
+regression_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "retention", "promotion", "prevention")
+scaled_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+regression_unscaled_vars <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+regression_unscaled_vars <- full_data_scaled[regression_unscaled_vars]
+
+xvars_scaled <- full_data_scaled[scaled_vars]
+xvars_scaled <- scale(xvars_scaled)
+mean(xvars_scaled, na.rm = TRUE)
+sd(xvars_scaled, na.rm = TRUE)
+
+regression_vars_complete <- cbind(xvars_scaled, regression_unscaled_vars)
+
+regression_control <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + retention + promotion + prevention, data = regression_vars_complete)
+
+bptest(regression_control) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do extra step
+regression_control <- coeftest(regression_control, vcov = vcovHC(regression_control, type="HC1"))
+
+summary(regression_control)
+
+stargazer(regression_control, type = "latex")
+```
+
+Prospects Regression:
+```{r}
+pros_regression_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+pros_scaled_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+pros_regression_unscaled_vars <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+pros_regression_unscaled_vars <- full_data_scaled[pros_regression_unscaled_vars]
+
+pros_xvars_scaled <- full_data_scaled[pros_scaled_vars]
+pros_xvars_scaled <- scale(pros_xvars_scaled)
+mean(pros_xvars_scaled, na.rm = TRUE)
+sd(pros_xvars_scaled, na.rm = TRUE)
+
+pros_regression_vars_complete <- cbind(pros_xvars_scaled, pros_regression_unscaled_vars)
+pros_regression_vars_complete <- subset(pros_regression_vars_complete, retention == 0, select = c(Age:prevention))
+
+regression_prospects <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = pros_regression_vars_complete)
+
+bptest(regression_prospects) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do additional steps.
+
+regression_prospects <- coeftest(regression_prospects, vcov = vcovHC(regression_prospects, type="HC1"))
+
+summary(regression_prospects)
+
+
+stargazer(regression_prospects, type = "latex")
+
+```
+
+retention regression:
+```{r}
+ret_regression_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+ret_scaled_vars <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+ret_regression_unscaled_vars <- c("Booked_Appointment", "retention", "promotion", "prevention")
+
+ret_regression_unscaled_vars <- full_data_scaled[ret_regression_unscaled_vars]
+
+ret_xvars_scaled <- full_data_scaled[ret_scaled_vars]
+ret_xvars_scaled <- scale(ret_xvars_scaled)
+mean(ret_xvars_scaled, na.rm = TRUE)
+sd(ret_xvars_scaled, na.rm = TRUE)
+
+ret_regression_vars_complete <- cbind(ret_xvars_scaled, ret_regression_unscaled_vars)
+ret_regression_vars_complete <- subset(ret_regression_vars_complete, retention == 1, select = c(Age:prevention))
+
+regression_retention <- lm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = ret_regression_vars_complete)
+
+bptest(regression_retention) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_retention <- coeftest(regression_retention, vcov = vcovHC(regression_retention, type="HC1"))
+
+summary(regression_retention)
+
+stargazer(regression_prospects, regression_retention, type = "latex")
+
+```
+
+correlation matrix:
+```{r}
+vif(regression_control) #historic HA purchases >5, concerning, remove.
+vif(regression_prospects) #historic HA purchases PERFECTLY COLLINEAR
+alias(regression_prospects)
+vif(regression_retention) #no worries, leave alone.
+```
+
+
+ALTERNATIVE DEPENDENT VAR
+scaling the data (normalisation) + Control Regression:
+```{r}
+#to back track a scale() function: data$variable * attr(data$variable, 'scaled:scale') + attr(data$variable, 'scaled:center')
+full_data_unsub <- full_data
+ifelse(full_data_unsub$Type == 3, 1, 0)
+full_data_scaled_alt2 <- full_data_unsub
+
+regression_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "retention", "promotion", "prevention")
+scaled_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+regression_unscaled_vars_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+regression_unscaled_vars_alt2 <- full_data_scaled_alt2[regression_unscaled_vars_alt2]
+
+xvars_scaled_alt2 <- full_data_scaled_alt2[scaled_vars_alt2]
+xvars_scaled_alt2 <- scale(xvars_scaled_alt2)
+mean(xvars_scaled_alt2, na.rm = TRUE)
+sd(xvars_scaled_alt2, na.rm = TRUE)
+
+regression_vars_complete_alt2 <- cbind(xvars_scaled_alt2, regression_unscaled_vars_alt2)
+
+regression_control_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + retention + promotion + prevention, data = regression_vars_complete_alt2)
+
+bptest(regression_control_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do extra step
+regression_control_alt2 <- coeftest(regression_control_alt2, vcov = vcovHC(regression_control_alt2, type="HC1"))
+
+summary(regression_control_alt2)
+
+stargazer(regression_control_alt2, type = "latex")
+```
+
+Prospects Regression:
+```{r}
+pros_regression_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+pros_scaled_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+pros_regression_unscaled_vars_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+pros_regression_unscaled_vars_alt2 <- full_data_scaled_alt2[pros_regression_unscaled_vars_alt2]
+
+pros_xvars_scaled_alt2 <- full_data_scaled_alt2[pros_scaled_vars_alt2]
+pros_xvars_scaled_alt2 <- scale(pros_xvars_scaled_alt2)
+mean(pros_xvars_scaled_alt2, na.rm = TRUE)
+sd(pros_xvars_scaled_alt2, na.rm = TRUE)
+
+pros_regression_vars_complete_alt2 <- cbind(pros_xvars_scaled_alt2, pros_regression_unscaled_vars_alt2)
+pros_regression_vars_complete_alt2 <- subset(pros_regression_vars_complete_alt2, retention == 0, select = c(Age:prevention))
+
+regression_prospects_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = pros_regression_vars_complete_alt2)
+
+bptest(regression_prospects_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so do additional steps.
+
+regression_prospects_alt2 <- coeftest(regression_prospects_alt2, vcov = vcovHC(regression_prospects_alt2, type="HC1"))
+
+summary(regression_prospects_alt2)
+
+stargazer(regression_prospects_alt2, type = "latex")
+
+```
+
+retention regression:
+```{r}
+ret_regression_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest", "promotion", "prevention")
+ret_scaled_vars_alt2 <- c("Age", "Gender", "Customer_Tenure", "Historic_Campaigns", "Historic_HA_Purchases", "Historic_purchases", "Max_Hearing_Loss", "Last_HearingTest")
+ret_regression_unscaled_vars_alt2 <- c("Type", "retention", "promotion", "prevention")
+
+ret_regression_unscaled_vars_alt2 <- full_data_scaled_alt2[ret_regression_unscaled_vars_alt2]
+
+ret_xvars_scaled_alt2 <- full_data_scaled_alt2[ret_scaled_vars_alt2]
+ret_xvars_scaled_alt2 <- scale(ret_xvars_scaled_alt2)
+mean(ret_xvars_scaled_alt2, na.rm = TRUE)
+sd(ret_xvars_scaled_alt2, na.rm = TRUE)
+
+ret_regression_vars_complete_alt2 <- cbind(ret_xvars_scaled_alt2, ret_regression_unscaled_vars_alt2)
+ret_regression_vars_complete_alt2 <- subset(ret_regression_vars_complete_alt2, retention == 1, select = c(Age:prevention))
+
+regression_retention_alt2 <- lm(Type ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest + promotion + prevention, data = ret_regression_vars_complete_alt2)
+
+bptest(regression_retention_alt2) # to test for heteroskedasticity.
+#p < 0.5 (by a lot), so continue normally.
+
+regression_retention_alt2 <- coeftest(regression_retention_alt2, vcov = vcovHC(regression_retention_alt2, type="HC1"))
+
+summary(regression_retention_alt2)
+
+stargazer(regression_control_alt2, regression_prospects_alt2, regression_retention_alt2, type = "latex")
+
+```
+
+
+ARCHIVE CODE:
+```{r}
+#make new variable: days since email sent
+pros_A_1mo$email_date <- ymd("2022/04/05")
+pros_A_1mo$days_since_email <- difftime(pros_A_1mo$Date, pros_A_1mo$email_date, units = c("days"))
+pros_A_1mo$days_since_email <- as.integer(pros_A_1mo$days_since_email)
+
+pros_B_1mo$email_date <- ymd("2022/04/05")
+pros_B_1mo$days_since_email <- difftime(pros_B_1mo$Date, pros_B_1mo$email_date, units = c("days"))
+pros_B_1mo$days_since_email <- as.integer(pros_B_1mo$days_since_email)
+
+pros_C_1mo$email_date <- ymd("2022/04/05")
+pros_C_1mo$days_since_email <- difftime(pros_C_1mo$Date, pros_C_1mo$email_date, units = c("days"))
+pros_C_1mo$days_since_email <- as.integer(pros_C_1mo$days_since_email)
+
+ret_A_1mo$email_date <- ymd("2022/04/05")
+ret_A_1mo$days_since_email <- difftime(ret_A_1mo$Date, ret_A_1mo$email_date, units = c("days"))
+ret_A_1mo$days_since_email <- as.integer(ret_A_1mo$days_since_email)
+
+ret_B_1mo$email_date <- ymd("2022/04/05")
+ret_B_1mo$days_since_email <- difftime(ret_B_1mo$Date, ret_B_1mo$email_date, units = c("days"))
+ret_B_1mo$days_since_email <- as.integer(ret_B_1mo$days_since_email)
+
+ret_C_1mo$email_date <- ymd("2022/04/05")
+ret_C_1mo$days_since_email <- difftime(ret_C_1mo$Date, ret_C_1mo$email_date, units = c("days"))
+ret_C_1mo$days_since_email <- as.integer(ret_C_1mo$days_since_email)
+
+```
+
+summ stats tables
+```{r}
+st(pros_A_1mo, out = 'latex')
+st(pros_B_1mo, out = 'latex')
+st(pros_C_1mo, out = 'latex')
+st(ret_A_1mo, out = 'latex')
+st(ret_B_1mo, out = 'latex')
+st(ret_C_1mo, out = 'latex')
+```
+
+logit regressions:
+#can refer to ASP Indiv Ass 3 for similar codes (Q2.2, 2.3) - so far done Binary, check if I should do Ordinal (with log.lik, AIC, mu,...) instead (or also)?
+```{r}
+pros_A_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = pros_A_1mo)
+
+pros_B_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = pros_B_1mo) 
+
+pros_C_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = pros_C_1mo) 
+
+ret_A_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = ret_A_1mo)
+
+ret_B_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = ret_B_1mo) 
+
+ret_C_reg1 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "logit"), data = ret_C_1mo) 
+
+stargazer(pros_A_reg1, pros_B_reg1, pros_C_reg1, ret_A_reg1, ret_B_reg1, ret_C_reg1, type = "text")
+coeftest(pros_A_reg1, vcov. = vcovHC, type = "HC1")
+coeftest(pros_B_reg1, vcov. = vcovHC, type = "HC1")
+coeftest(pros_C_reg1, vcov. = vcovHC, type = "HC1")
+coeftest(ret_A_reg1, vcov. = vcovHC, type = "HC1")
+coeftest(ret_B_reg1, vcov. = vcovHC, type = "HC1")
+coeftest(ret_C_reg1, vcov. = vcovHC, type = "HC1")
+#coeftest and stargazer give different results? which do I use...
+```
+
+probit regressions:
+#https://www.econometrics-with-r.org/11-2-palr.html
+```{r}
+pros_A_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = pros_A_1mo)
+
+pros_B_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = pros_B_1mo) 
+
+pros_C_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = pros_C_1mo) 
+
+ret_A_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = ret_A_1mo)
+
+ret_B_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = ret_B_1mo) 
+
+ret_C_reg2 <- glm(Booked_Appointment ~ Leeftijd + years_since_first_test + Historic_campaings + Historic_purchases + days_since_email, family = "binomial"(link = "probit"), data = ret_C_1mo) 
+
+stargazer(pros_A_reg2, pros_B_reg2, pros_C_reg2, ret_A_reg2, ret_B_reg2, ret_C_reg2, type = "text")
+
+coeftest(pros_A_reg2, vcov. = vcovHC, type = "HC1")
+coeftest(pros_B_reg2, vcov. = vcovHC, type = "HC1")
+coeftest(pros_C_reg2, vcov. = vcovHC, type = "HC1")
+coeftest(ret_A_reg2, vcov. = vcovHC, type = "HC1")
+coeftest(ret_B_reg2, vcov. = vcovHC, type = "HC1")
+coeftest(ret_C_reg2, vcov. = vcovHC, type = "HC1")
+#coeftest and stargazer give different results? which do I use...
+```
+
+
+```{r}
+#undoing scales
+full_data$Age * attr(full_data$Age, 'scaled:scale') + attr(full_data$Age, 'scaled:center')
+full_data$Gender * attr(full_data$Gender, 'scaled:scale') + attr(full_data$Gender, 'scaled:center')
+full_data$Customer_Tenure * attr(full_data$Customer_Tenure, 'scaled:scale') + attr(full_data$Customer_Tenure, 'scaled:center')
+full_data$Historic_Campaigns * attr(full_data$Historic_Campaigns, 'scaled:scale') + attr(full_data$Historic_Campaigns, 'scaled:center')
+full_data$Historic_HA_Purchases * attr(full_data$Historic_HA_Purchases, 'scaled:scale') + attr(full_data$Historic_HA_Purchases, 'scaled:center')
+full_data$Historic_purchases * attr(full_data$Historic_purchases, 'scaled:scale') + attr(full_data$Historic_purchases, 'scaled:center')
+full_data$Max_Hearing_Loss * attr(full_data$Max_Hearing_Loss, 'scaled:scale') + attr(full_data$Max_Hearing_Loss, 'scaled:center')
+full_data$Last_HearingTest * attr(full_data$Last_HearingTest, 'scaled:scale') + attr(full_data$Last_HearingTest, 'scaled:center')
+full_data$Booked_Appointment * attr(full_data$Booked_Appointment, 'scaled:scale') + attr(full_data$Booked_Appointment, 'scaled:center')
+```
+
+
+control regression:
+```{r}
+control_only <- subset(full_data, control == 1, select = c(Date:retention))
+control_only_pros <- subset(control_only, prospect == 1, select = c(Date:retention))
+control_only_ret <- subset(control_only, retention == 1, select = c(Date:retention))
+
+control_regression_pros <- glm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest, family = binomial(link = "logit"), maxit = 100, data = control_only_pros)
+
+control_regression_ret <- glm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest, family = binomial(link = "logit"), maxit = 100, data = control_only_ret)
+
+control_regression_pros_prob <- glm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest, family = binomial(link = "probit"), maxit = 100, data = control_only_pros)
+
+control_regression_ret_prob <- glm(Booked_Appointment ~ Age + Gender + Customer_Tenure + Historic_Campaigns + Historic_HA_Purchases + Historic_purchases + Max_Hearing_Loss + Last_HearingTest, family = binomial(link = "probit"), maxit = 100, data = control_only_ret)
+
+stargazer(control_regression_pros, control_regression_ret, control_regression_pros_prob, control_regression_ret_prob, type = "latex")
+
+#seems wrong, see neg relation between max hearing loss and booked appts.
+
+```
+
+
+Aurelie Regression Codes:
+```{r}
+myreg <- lm(.)
+
+bptest(myreg) # to test whether you need white correction
+
+#if yes:
+
+mymodel = coeftest(myreg, vcov = vcovHC(myreg, type="HC1"))
+
+summary(mymodel)
+```
